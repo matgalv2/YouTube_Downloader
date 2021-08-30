@@ -153,7 +153,7 @@ class DetailsPage(ttk.Frame):
                     # dash or progressive
                     if int(str(quality.get()).replace('p', '')) <= 720:
                         # progressive
-                        video.streams.filter(resolution=quality.get()).first().download(output_path=filePath)
+                        video.streams.filter(resolution=quality.get(), is_dash=False).first().download(output_path=filePath)
                         pass
 
                     else:
