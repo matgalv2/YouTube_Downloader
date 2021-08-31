@@ -119,45 +119,74 @@ class DetailsPage(ttk.Frame):
         backButton = ttk.Button(self, text="Back", command=lambda: back())
         backButton.place(x=300, y=250)
 
-        warningLabel = ttk.Label(self, text="Please select type and quality.")
+        warningLabel = ttk.Label(self, text="Please select a quality.")
         nIc_Label = ttk.Label(self, text="No Internet connection.")
+        errorLabel = ttk.Label(self, text="Something failed, check your Internet connection.")
+
+        # errorLabel.place(x=75, y=210)
+        # warningLabel.place(x=140, y=210)
+        # nIc_Label.place(x=130, y=210)
+
 
         def download_video():
 
             chosenOption = sharedVariable.get()
 
             # check if both needed things are selected
-            if chosenOption == 0 or quality.get() == askForBitrate or quality.get() == askForResolution:
-                warningLabel.place(x=200, y=190)
+            if chosenOption == 0:
+                warningLabel.configure(text="Please select a type and a quality.")
+                warningLabel.place(x=110, y=210)
+                controller.after(3000, lambda: warningLabel.place_forget())
+                return
+
+            elif quality.get() == askForBitrate or quality.get() == askForResolution:
+                warningLabel.configure(text="Please select a quality.")
+                warningLabel.place(x=140, y=210)
                 controller.after(3000, lambda: warningLabel.place_forget())
                 return
 
             elif not network_connection_is_valid():
-                nIc_Label.place(x=210, y=190)
+                nIc_Label.place(x=130, y=210)
                 controller.after(3000, lambda: nIc_Label.place_forget())
                 return
+
             else:
-                # pick a folder
-
                 # TODO:
-                #   1. Wybranie miejsca dla pliku.
+                #   1. Wybranie miejsca dla pliku. ✓
                 #   2. Pobranie odpowieniego streamu.
-                #   3. Sprawdzić, czy video.title pobiera tytuł z Internetu.
+                #   3. Sprawdzić, czy video.title pobiera tytuł z Internetu. ✓
 
-                filePath = tkinter.filedialog.asksaveasfilename(initialfile=normalise_filename(video.title))
+                # getting right extension
+                if chosenOption in {1,3}:
+                    extension = "mp4"
+                    extensionName = "MP4 Video File"
+                else:
+                    extension = "mp3"
+                    extensionName = "MPEG Audio"
+
+                # attempt of getting video title
+                videoTitle = get_video_title(video)
+                if videoTitle is None:
+                    errorLabel.place(x=75, y=210)
+                    controller.after(4000, lambda: errorLabel.place_forget())
+                    return
+
+                # picking a folder
+                filePath = tkinter.filedialog.asksaveasfilename(initialfile=normalise_filename(video.title), filetype=[(extensionName, "*."+extension), ("Wszystkie pliki", "*.*")] , defaultextension=extension)
 
                 # download
-
-
                 if chosenOption == 1:
                     # dash or progressive
                     if int(str(quality.get()).replace('p', '')) <= 720:
                         # progressive
-                        video.streams.filter(resolution=quality.get(), is_dash=False).first().download(output_path=filePath)
-                        pass
-
+                        video.streams.filter(resolution=quality.get(), is_dash=False).first().download(filename=filePath)
                     else:
                         # dash
+                        video.streams.filter(abr=quality.get(), only_audio=True).first().download(filename=filePath)
+
+                        video.streams.filter(resolution=quality.get(), only_video=True).first().download(filename=filePath)
+
+                        # i tu merguje audio i video
 
                         # video_stream = ffmpeg.input('Of Monsters and Men - Wild Roses.mp4')
                         # audio_stream = ffmpeg.input('Of Monsters and Men - Wild Roses_audio.mp4')
@@ -165,14 +194,10 @@ class DetailsPage(ttk.Frame):
                         pass
 
                 elif chosenOption == 2:
-                    video.streams.filter(resolution=quality.get(), only_audio=True,
-                                         file_extension='mp3').first().download(output_path=filePath)
-                # elif chosenOption == 3:
+                    video.streams.filter(abr=quality.get(), only_audio=True).first().download(filename=filePath)
+
                 else:
-                    video.streams.filter(resolution=quality.get(), only_video=True,
-                                         file_extension='mp4').first().download(output_path=filePath)
-                # else:
-                #     pass
+                    video.streams.filter(resolution=quality.get(), only_video=True).first().download(filename=filePath)
 
         def radioButton1_3():
             quality.configure(values=sort_quality(get_dash_resolutions(video)))

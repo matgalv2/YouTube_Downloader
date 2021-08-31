@@ -100,3 +100,14 @@ def normalise_filename(filename: str) -> str:
         else:
             new_filename = new_filename + char
     return new_filename
+
+def get_video_title(video: YouTube) -> str:
+    try:
+        title = video.title
+    except (urllib.error.URLError, Exception):
+        return ""
+    else:
+        return title
+
+def get_video(audio, video, resolution, abr):
+    pass
