@@ -2,7 +2,8 @@ import sys
 import tkinter.filedialog
 from tkinter import ttk
 from tkinter import *
-from tkinter.ttk import Combobox
+import os
+from moviepy.editor import *
 
 from utilitis import *
 
@@ -11,6 +12,11 @@ video: YouTube = None
 
 askForResolution = "Select a resolution"
 askForBitrate = "Select a bitrate"
+
+
+# TODO:
+#   1.Historia pobrań
+#   2. Pobieranie playlist
 
 
 class App(Tk):
@@ -113,7 +119,7 @@ class DetailsPage(ttk.Frame):
         quality = ttk.Combobox(self, state="readonly")
         quality.place(x=210, y=120)
 
-        downloadButton = ttk.Button(self, text="Download", command=lambda: download_video())
+        downloadButton = ttk.Button(self, text="Download", command=lambda: get_video())
         downloadButton.place(x=30, y=250)
 
         backButton = ttk.Button(self, text="Back", command=lambda: back())
@@ -128,7 +134,7 @@ class DetailsPage(ttk.Frame):
         # nIc_Label.place(x=130, y=210)
 
 
-        def download_video():
+        def get_video():
 
             chosenOption = sharedVariable.get()
 
@@ -151,11 +157,6 @@ class DetailsPage(ttk.Frame):
                 return
 
             else:
-                # TODO:
-                #   1. Wybranie miejsca dla pliku. ✓
-                #   2. Pobranie odpowieniego streamu.
-                #   3. Sprawdzić, czy video.title pobiera tytuł z Internetu. ✓
-
                 # getting right extension
                 if chosenOption in {1,3}:
                     extension = "mp4"
@@ -173,27 +174,32 @@ class DetailsPage(ttk.Frame):
 
                 # picking a folder
                 filePath = tkinter.filedialog.asksaveasfilename(initialfile=normalise_filename(video.title), filetype=[(extensionName, "*."+extension), ("Wszystkie pliki", "*.*")] , defaultextension=extension)
+                # return
 
                 # download
                 if chosenOption == 1:
                     # dash or progressive
-                    if int(str(quality.get()).replace('p', '')) <= 720:
+                    if int(quality.get().replace('p', '')) <= 720:
                         # progressive
                         video.streams.filter(resolution=quality.get(), is_dash=False).first().download(filename=filePath)
                     else:
                         # dash
-                        video.streams.filter(abr=quality.get(), only_audio=True).first().download(filename=filePath)
+                        audioPath = filePath[:-4] + "_audio.mp4"
+                        videoPath = filePath[:-4] + "_video.mp4"
 
-                        video.streams.filter(resolution=quality.get(), only_video=True).first().download(filename=filePath)
+                        video.streams.filter(only_audio=True).first().download(filename=audioPath)
+                        video.streams.filter(resolution=quality.get(), only_video=True).first().download(filename=videoPath)
 
-                        # i tu merguje audio i video
+                        audio_stream = ffmpeg.input(audioPath)
+                        video_stream = ffmpeg.input(videoPath)
 
-                        # video_stream = ffmpeg.input('Of Monsters and Men - Wild Roses.mp4')
-                        # audio_stream = ffmpeg.input('Of Monsters and Men - Wild Roses_audio.mp4')
-                        # ffmpeg.output(audio_stream, video_stream, 'out.mp4').run()
-                        pass
+                        ffmpeg.output(audio_stream, video_stream, filePath).run()
+
+                        os.remove(audioPath)
+                        os.remove(videoPath)
 
                 elif chosenOption == 2:
+                    # converting mp4 -> mp3 is redundant because the file contains only audio, so renaming extension is sufficient
                     video.streams.filter(abr=quality.get(), only_audio=True).first().download(filename=filePath)
 
                 else:

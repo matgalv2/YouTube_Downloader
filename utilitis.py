@@ -4,7 +4,7 @@ from pytube import YouTube, Stream, StreamQuery
 from urllib import request
 import re
 from PIL import Image, ImageTk
-
+import ffmpeg
 
 path = os.curdir
 image_name = "video_thumbnail.jpg"
@@ -109,5 +109,34 @@ def get_video_title(video: YouTube) -> str:
     else:
         return title
 
-def get_video(audio, video, resolution, abr):
-    pass
+def download_video(video: YouTube, filePath: str, contains_audio, contains_video, resolution, abr):
+    if contains_audio and contains_video:
+        # dash or progressive
+        if int(resolution.replace('p', '')) <= 720:
+            # progressive
+            video.streams.filter(res=resolution, is_dash=False).first().download(filename=filePath)
+        else:
+            # dash
+            audioPath = filePath[:-4] + "_audio.mp4"
+            videoPath = filePath[:-4] + "_video.mp4"
+
+            video.streams.filter(only_audio=True).first().download(filename=audioPath)
+            video.streams.filter(res=resolution, only_video=True).first().download(filename=videoPath)
+
+            audio_stream = ffmpeg.input(audioPath)
+            video_stream = ffmpeg.input(videoPath)
+
+            ffmpeg.output(audio_stream, video_stream, filePath).run()
+
+            os.remove(audioPath)
+            os.remove(videoPath)
+
+    elif contains_audio and not contains_video :
+        # converting mp4 -> mp3 is redundant because the file contains only audio, so renaming extension is sufficient
+        video.streams.filter(abr=abr, only_audio=True).first().download(filename=filePath)
+
+    elif contains_video and not contains_audio:
+        video.streams.filter(res=resolution, only_video=True).first().download(filename=filePath)
+
+    else:
+        return -1
