@@ -5,7 +5,7 @@ from tkinter import *
 import os
 from moviepy.editor import *
 
-from utilitis import *
+from utils import *
 
 video: YouTube = None
 
@@ -15,7 +15,7 @@ askForBitrate = "Select a bitrate"
 
 
 # TODO:
-#   1.Historia pobrań
+#   1. Historia pobrań
 #   2. Pobieranie playlist
 
 
@@ -23,7 +23,6 @@ class App(Tk):
     def __init__(self, *args, **kwargs):
         Tk.__init__(self, *args, **kwargs)
         self.title("YouTube Downloader")
-
         self.geometry('800x450')
         self.resizable(height=False, width=False)
         self.__container = ttk.Frame(self)
@@ -39,6 +38,11 @@ class App(Tk):
 
     def add_pages(self, *args):
         for arg in args:
+
+            # s = tkinter.ttk.Style()
+            # s.configure("My.TFrame", background="blue")
+            # frame = arg(self.__container, self, style="My.TFrame")
+
             frame = arg(self.__container, self)
             frame.grid(row=0, column=0, sticky='nsew')
             self.__frames[arg] = frame
@@ -55,11 +59,10 @@ class SearchPage(ttk.Frame):
     def __init__(self, master, controller: App):
         ttk.Frame.__init__(self, master)
         controller.geometry('300x300')
-
         ttk.Label(self, text="Enter a link below:").place(x=20, y=30)
 
         text = ttk.Entry(self, width=36, font="Calibri 11")
-        text.place(x=20, y=50, height=20)
+        text.place(x=20, y=50, height=30)
 
         ttk.Button(self, text="Search", command=lambda: search_command(text.get())).place(x=200, y=200)
 
@@ -175,35 +178,38 @@ class DetailsPage(ttk.Frame):
                 # picking a folder
                 filePath = tkinter.filedialog.asksaveasfilename(initialfile=normalise_filename(video.title), filetype=[(extensionName, "*."+extension), ("Wszystkie pliki", "*.*")] , defaultextension=extension)
                 # return
+                try:
+                    # download
+                    if chosenOption == 1:
+                        # dash or progressive
+                        if int(quality.get().replace('p', '')) <= 720:
+                            # progressive
+                            video.streams.filter(resolution=quality.get(), is_dash=False).first().download(filename=filePath)
+                        else:
+                            # dash
+                            audioPath = filePath[:-4] + "_audio.mp4"
+                            videoPath = filePath[:-4] + "_video.mp4"
 
-                # download
-                if chosenOption == 1:
-                    # dash or progressive
-                    if int(quality.get().replace('p', '')) <= 720:
-                        # progressive
-                        video.streams.filter(resolution=quality.get(), is_dash=False).first().download(filename=filePath)
+                            video.streams.filter(only_audio=True).first().download(filename=audioPath)
+                            video.streams.filter(resolution=quality.get(), only_video=True).first().download(filename=videoPath)
+
+                            audio_stream = ffmpeg.input(audioPath)
+                            video_stream = ffmpeg.input(videoPath)
+
+                            ffmpeg.output(audio_stream, video_stream, filePath).run()
+
+                            os.remove(audioPath)
+                            os.remove(videoPath)
+
+                    elif chosenOption == 2:
+                        # converting mp4 -> mp3 is redundant because the file contains only audio, so renaming extension is sufficient
+                        video.streams.filter(abr=quality.get(), only_audio=True).first().download(filename=filePath)
+
                     else:
-                        # dash
-                        audioPath = filePath[:-4] + "_audio.mp4"
-                        videoPath = filePath[:-4] + "_video.mp4"
-
-                        video.streams.filter(only_audio=True).first().download(filename=audioPath)
-                        video.streams.filter(resolution=quality.get(), only_video=True).first().download(filename=videoPath)
-
-                        audio_stream = ffmpeg.input(audioPath)
-                        video_stream = ffmpeg.input(videoPath)
-
-                        ffmpeg.output(audio_stream, video_stream, filePath).run()
-
-                        os.remove(audioPath)
-                        os.remove(videoPath)
-
-                elif chosenOption == 2:
-                    # converting mp4 -> mp3 is redundant because the file contains only audio, so renaming extension is sufficient
-                    video.streams.filter(abr=quality.get(), only_audio=True).first().download(filename=filePath)
-
-                else:
-                    video.streams.filter(resolution=quality.get(), only_video=True).first().download(filename=filePath)
+                        video.streams.filter(resolution=quality.get(), only_video=True).first().download(filename=filePath)
+                except Exception:
+                    errorLabel.place(x=75, y=210)
+                    controller.after(5000, lambda: errorLabel.place_forget())
 
         def radioButton1_3():
             quality.configure(values=sort_quality(get_dash_resolutions(video)))

@@ -5,10 +5,20 @@ from urllib import request
 import re
 from PIL import Image, ImageTk
 import ffmpeg
+from shutil import disk_usage
+
 
 path = os.curdir
 image_name = "video_thumbnail.jpg"
 
+
+class NotEnoughSpaceError(Exception):
+    def __init__(self):
+        super().__init__()
+
+class DownloadingError(Exception):
+    def __init__(self):
+        super().__init__()
 
 def site_exists(link: str) -> bool:
     try:
@@ -120,23 +130,34 @@ def download_video(video: YouTube, filePath: str, contains_audio, contains_video
             audioPath = filePath[:-4] + "_audio.mp4"
             videoPath = filePath[:-4] + "_video.mp4"
 
-            video.streams.filter(only_audio=True).first().download(filename=audioPath)
-            video.streams.filter(res=resolution, only_video=True).first().download(filename=videoPath)
+            download_only_audio(video, audioPath)
+            download_only_video(video, resolution, videoPath)
 
-            audio_stream = ffmpeg.input(audioPath)
-            video_stream = ffmpeg.input(videoPath)
-
-            ffmpeg.output(audio_stream, video_stream, filePath).run()
-
-            os.remove(audioPath)
-            os.remove(videoPath)
+            merge_audio_and_video(audioPath, videoPath, filePath)
 
     elif contains_audio and not contains_video :
         # converting mp4 -> mp3 is redundant because the file contains only audio, so renaming extension is sufficient
-        video.streams.filter(abr=abr, only_audio=True).first().download(filename=filePath)
-
+        download_only_audio(video, filePath, abr=abr)
     elif contains_video and not contains_audio:
-        video.streams.filter(res=resolution, only_video=True).first().download(filename=filePath)
-
+        download_only_video(video, resolution, filePath)
     else:
         return -1
+
+def download_only_audio(video, filePath, abr=None):
+    if abr is not None:
+        video.streams.filter(abr=abr, only_audio=True).first().download(filename=filePath)
+    else:
+        video.streams.filter(only_audio=True).first().download(filename=filePath)
+
+
+def download_only_video(video, resolution, filePath):
+    video.streams.filter(res=resolution, only_video=True).first().download(filename=filePath)
+
+
+def merge_audio_and_video(audioPath, videoPath, outputPath):
+    audio_stream = ffmpeg.input(audioPath)
+    video_stream = ffmpeg.input(videoPath)
+    ffmpeg.output(audio_stream, video_stream, outputPath).run()
+
+def willFit(size, disk):
+    return True if disk_usage(disk).free >= 1.01 * size else False
